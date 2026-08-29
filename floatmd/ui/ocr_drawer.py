@@ -61,13 +61,19 @@ class OcrDrawer(QFrame):
         head.addWidget(title)
         status = engine_status()
         eng = {
-            "paddle+rapid": "Paddle",
-            "paddle": "Paddle",
-            "rapid": "Rapid",
-        }.get(status, "—")
+            "rapid+paddle": "OCR",
+            "rapid": "OCR",
+            "paddle": "OCR",
+        }.get(status, "OCR")
         self.engine_label = QLabel(eng)
         self.engine_label.setObjectName("ocrStatus")
-        self.engine_label.setToolTip(f"引擎: {status}")
+        tip = {
+            "rapid+paddle": "内置 RapidOCR（可用 Paddle）",
+            "rapid": "内置 RapidOCR",
+            "paddle": "PaddleOCR",
+            "none": "OCR 未就绪",
+        }.get(status, status)
+        self.engine_label.setToolTip(tip)
         head.addWidget(self.engine_label)
         head.addStretch(1)
         self.close_btn = QPushButton("▾")
@@ -212,7 +218,7 @@ class OcrDrawer(QFrame):
         assert isinstance(result, OcrResult)
         self.result.setPlainText(result.text)
         self.status.setText("OK" if result.text else "空")
-        self.engine_label.setText("Paddle" if "paddle" in result.engine else "Rapid")
+        self.engine_label.setText("OCR")
 
     def _on_err(self, err: object) -> None:
         self.status.setText("失败")

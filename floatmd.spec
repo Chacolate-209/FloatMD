@@ -1,26 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller onedir (green folder) build for FloatMD.
-# Usage:
-#   pyinstaller floatmd.spec
+# PyInstaller onedir build — bundles RapidOCR (no external pip for OCR).
 # Output: dist/FloatMD/
 
-import sys
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
+from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_dynamic_libs
 
 block_cipher = None
 root = Path(SPECPATH)
 
 datas = []
-datas += collect_data_files("floatmd", includes=["resources/**/*"])
-
-# Optional OCR models shipped with rapidocr (if installed)
-try:
-    datas += collect_data_files("rapidocr_onnxruntime")
-except Exception:
-    pass
-
+binaries = []
 hiddenimports = [
     "PySide6.QtCore",
     "PySide6.QtGui",
@@ -40,16 +30,30 @@ hiddenimports = [
     "markdown",
     "pymdownx",
     "rapidocr_onnxruntime",
+    "onnxruntime",
 ]
 
-binaries = []
-# Qt WebEngine / platform plugins
+datas += collect_data_files("floatmd", includes=["resources/**/*"])
+
+# Bundle RapidOCR models + onnxruntime native libs into the app.
+for pkg in ("rapidocr_onnxruntime", "onnxruntime"):
+    try:
+        d, b, h = collect_all(pkg)
+        datas += d
+        binaries += b
+        hiddenimports += h
+    except Exception:
+        try:
+            datas += collect_data_files(pkg)
+        except Exception:
+            pass
+
 try:
     binaries += collect_dynamic_libs("PySide6")
 except Exception:
     pass
 
-# Keep default green build lean: RapidOCR only (Paddle is optional / huge).
+# Keep green build lean: do not ship Paddle / OpenCV.
 excludes = [
     "tkinter",
     "matplotlib",
@@ -91,7 +95,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=False,  # windowed
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

@@ -29,10 +29,23 @@ def test_recognize_with_available_engine() -> None:
         with pytest.raises(ocr_engine.OcrError) as ei:
             ocr_engine.recognize_png(png)
         assert ei.value.code == "engine_missing"
+        assert "pip install" not in ei.value.message
         return
     result = ocr_engine.recognize_png(png)
     assert isinstance(result.text, str)
     assert result.engine in {"paddleocr", "rapidocr"}
-    # Synthetic rendered text should be readable by RapidOCR at least
-    if result.engine == "rapidocr":
+    # Default path is RapidOCR
+    if ocr_engine.rapid_available():
+        assert result.engine == "rapidocr"
         assert "Hello" in result.text
+
+
+def test_engine_missing_message_has_no_pip(monkeypatch: pytest.MonkeyPatch) -> None:
+    """End-user builds must not tell people to pip install."""
+    monkeypatch.setattr(ocr_engine, "rapid_available", lambda: False)
+    monkeypatch.setattr(ocr_engine, "paddle_available", lambda: False)
+    png = _png_with_text()
+    with pytest.raises(ocr_engine.OcrError) as ei:
+        ocr_engine.recognize_png(png)
+    assert ei.value.code == "engine_missing"
+    assert "pip" not in ei.value.message.lower()

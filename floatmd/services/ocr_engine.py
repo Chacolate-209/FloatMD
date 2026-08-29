@@ -1,4 +1,4 @@
-"""OCR backends: PaddleOCR preferred, RapidOCR fallback."""
+"""OCR: RapidOCR is the built-in default; PaddleOCR is optional if present."""
 
 from __future__ import annotations
 
@@ -28,10 +28,10 @@ _lock = threading.Lock()
 _paddle_ocr = None
 _paddle_init_error: str | None = None
 _rapid = None
+_rapid_init_error: str | None = None
 
 
 def _prep_paddle_runtime() -> None:
-    # Mitigate OneDNN / PIR crashes on some CPU wheels.
     os.environ.setdefault("FLAGS_use_mkldnn", "0")
     os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
     try:
@@ -63,12 +63,12 @@ def rapid_available() -> bool:
 
 
 def engine_status() -> str:
-    parts = []
-    if paddle_available():
-        parts.append("paddle")
+    """Status string for UI (Rapid is the shipped default)."""
     if rapid_available():
-        parts.append("rapid")
-    return "+".join(parts) if parts else "none"
+        return "rapid+paddle" if paddle_available() else "rapid"
+    if paddle_available():
+        return "paddle"
+    return "none"
 
 
 def _get_paddle():
@@ -108,14 +108,20 @@ def _get_paddle():
 
 
 def _get_rapid():
-    global _rapid
+    global _rapid, _rapid_init_error
     with _lock:
         if _rapid is not None:
             return _rapid
-        from rapidocr_onnxruntime import RapidOCR
+        if _rapid_init_error:
+            raise OcrError("init_failed", _rapid_init_error)
+        try:
+            from rapidocr_onnxruntime import RapidOCR
 
-        _rapid = RapidOCR()
-        return _rapid
+            _rapid = RapidOCR()
+            return _rapid
+        except Exception as exc:  # noqa: BLE001
+            _rapid_init_error = str(exc)
+            raise OcrError("init_failed", f"OCR 初始化失败：{exc}") from exc
 
 
 def _lines_from_paddle(raw) -> list[str]:
@@ -123,10 +129,8 @@ def _lines_from_paddle(raw) -> list[str]:
     if raw is None:
         return lines
 
-    # New paddlex Result objects / list thereof
     if isinstance(raw, list) and raw:
         first = raw[0]
-        # Classic PP-OCR: [[box, (text, score)], ...]
         if isinstance(first, list):
             for item in first:
                 try:
@@ -136,7 +140,6 @@ def _lines_from_paddle(raw) -> list[str]:
                 if text:
                     lines.append(str(text))
             return lines
-        # predict() → list[Result]
         for item in raw:
             texts = None
             if hasattr(item, "rec_texts"):
@@ -161,10 +164,10 @@ def _lines_from_paddle(raw) -> list[str]:
 
 def _recognize_paddle(png_bytes: bytes, progress: Callable[[str], None] | None) -> OcrResult:
     if progress:
-        progress("加载 PaddleOCR…")
+        progress("加载 Paddle…")
     ocr = _get_paddle()
     if progress:
-        progress("Paddle 识别中…")
+        progress("识别中…")
 
     import numpy as np
     from PIL import Image
@@ -200,15 +203,12 @@ def _recognize_paddle(png_bytes: bytes, progress: Callable[[str], None] | None) 
 
 def _recognize_rapid(png_bytes: bytes, progress: Callable[[str], None] | None) -> OcrResult:
     if progress:
-        progress("加载 RapidOCR…")
+        progress("识别中…")
     engine = _get_rapid()
-    if progress:
-        progress("RapidOCR 识别中…")
     result, _elapse = engine(png_bytes)
     lines: list[str] = []
     if result:
         for item in result:
-            # item: [box, text, score]
             try:
                 lines.append(str(item[1]))
             except Exception:
@@ -217,33 +217,34 @@ def _recognize_rapid(png_bytes: bytes, progress: Callable[[str], None] | None) -
 
 
 def recognize_png(png_bytes: bytes, progress: Callable[[str], None] | None = None) -> OcrResult:
+    """Run OCR. Built-in path is RapidOCR; Paddle is used only if already installed."""
     if not png_bytes:
         raise OcrError("empty_image", "图片为空")
 
     errors: list[str] = []
+
+    # Bundled default first — no external install required for end users.
+    if rapid_available():
+        try:
+            return _recognize_rapid(png_bytes, progress)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"rapid: {exc}")
+            if progress:
+                progress("内置 OCR 失败，尝试其它引擎…")
 
     if paddle_available():
         try:
             return _recognize_paddle(png_bytes, progress)
         except Exception as exc:  # noqa: BLE001
             errors.append(f"paddle: {exc}")
-            if progress:
-                progress(f"Paddle 失败，尝试备用引擎… ({exc})")
 
-    if rapid_available():
-        try:
-            return _recognize_rapid(png_bytes, progress)
-        except Exception as exc:  # noqa: BLE001
-            errors.append(f"rapid: {exc}")
-
-    if not paddle_available() and not rapid_available():
+    if not rapid_available() and not paddle_available():
         raise OcrError(
             "engine_missing",
-            "未安装 OCR 引擎。请执行: pip install paddlepaddle paddleocr\n"
-            "或备用: pip install rapidocr-onnxruntime",
+            "OCR 组件未包含在当前程序中，请重新下载完整安装包。",
         )
 
     raise OcrError(
         "recognize_failed",
-        "所有 OCR 引擎均失败：\n" + "\n".join(errors),
+        "识别失败：" + ("；".join(errors) if errors else "未知错误"),
     )
