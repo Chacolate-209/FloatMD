@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; img-src data: blob: file:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'none';" />
+  <link rel="stylesheet" href="vendor/highlight.github.min.css" />
+  <link rel="stylesheet" href="vendor/katex.min.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <article id="content"><p class="empty">切换到显示模式以预览 Markdown</p></article>
+
+  <script src="vendor/marked.min.js"></script>
+  <script src="vendor/purifier.min.js"></script>
+  <script src="vendor/highlight.min.js"></script>
+  <script src="vendor/katex.min.js"></script>
+  <script src="vendor/auto-render.min.js"></script>
+  <script src="vendor/mermaid.min.js"></script>
+  <script>
+    (function () {
+      const content = document.getElementById("content");
+
+      marked.setOptions({ gfm: true, breaks: false });
+
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: "neutral",
+        securityLevel: "strict",
+        fontFamily: '"Noto Sans CJK SC", "Microsoft YaHei", "Segoe UI", sans-serif',
+      });
+
+      function promoteMermaid(root) {
+        root.querySelectorAll("pre > code").forEach((code) => {
+          const cls = code.className || "";
+          const isMermaid = /(^|\s)language-mermaid(\s|$)/.test(cls) || cls === "mermaid";
+          if (!isMermaid) return;
+          const pre = code.parentElement;
+          if (!pre) return;
+          const wrap = document.createElement("pre");
+          wrap.className = "mermaid";
+          wrap.textContent = code.textContent || "";
+          pre.replaceWith(wrap);
+        });
+      }
+
+      function highlightBlocks(root) {
+        root.querySelectorAll("pre > code").forEach((block) => {
+          try { hljs.highlightElement(block); } catch (e) { /* ignore */ }
+        });
+      }
+
+      function renderMath(root) {
+        try {
+          renderMathInElement(root, {
+            delimiters: [
+              { left: "$$", right: "$$", display: true },
+              { left: "$", right: "$", display: false },
+              { left: "\\(", right: "\\)", display: false },
+              { left: "\\[", right: "\\]", display: true },
+            ],
+            throwOnError: false,
+          });
+        } catch (e) {
+          console.warn("katex", e);
+        }
+      }
+
+      async function renderMermaid(root) {
+        const nodes = root.querySelectorAll("pre.mermaid");
+        if (!nodes.length) return;
+        try {
+          await mermaid.run({ nodes });
+        } catch (e) {
+          console.warn("mermaid", e);
+        }
+      }
+
+      window.setMarkdown = async function setMarkdown(md) {
+        if (!md || !String(md).trim()) {
+          content.innerHTML = '<p class="empty">空笔记</p>';
+          return;
+        }
+        let html = marked.parse(String(md));
+        html = DOMPurify.sanitize(html, {
+          USE_PROFILES: { html: true },
+          ADD_TAGS: ["svg", "path", "g", "marker", "defs", "clipPath", "use", "foreignObject", "polygon", "polyline", "line", "rect", "circle", "ellipse", "text", "tspan"],
+          ADD_ATTR: ["class", "id", "style", "viewBox", "d", "cx", "cy", "r", "x", "y", "width", "height", "fill", "stroke", "transform", "xmlns", "stroke-width", "text-anchor"],
+        });
+        content.innerHTML = html;
+        promoteMermaid(content);
+        highlightBlocks(content);
+        renderMath(content);
+        await renderMermaid(content);
+      };
+
+      window.__floatmd_ready = true;
+    })();
+  </script>
+</body>
+</html>

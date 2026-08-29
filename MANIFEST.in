@@ -1,0 +1,2 @@
+recursive-include floatmd/resources *
+global-exclude *.pyc __pycache__
