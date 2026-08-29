@@ -1,118 +1,126 @@
 # FloatMD
 
-轻量桌面悬浮 Markdown 笔记（Python · PySide6 · Windows 优先）。
+桌面上的悬浮笔记工具：随时记、好看地读，需要时用 AI 改几行，还能截图识字。
 
-设计文档见 [`DESIGN.md`](DESIGN.md)。
+面向 Windows（也支持从源码在 Linux 上跑）。笔记就是本地 `.md` 文件，数据在你自己电脑上。
 
-## 开发运行
+---
+
+## 它解决什么问题
+
+写东西时经常要在「大编辑器 / 浏览器 / 聊天窗口」之间来回切：记一句灵感要打开一整套软件，看 Markdown 要么是裸文本要么是笨重的知识库，改两段话还要把全文贴给 AI。
+
+FloatMD 做成一块**常驻桌面的小悬浮窗**：
+
+- 需要就置顶，不需要就收进托盘  
+- 编辑和美化预览一键切换  
+- AI 只动你选中的那几行（整篇重排是单独的「排版」）  
+- 截图 / 粘贴图片就能 OCR，结果插回笔记  
+
+适合：边看文档边记要点、边写边让 AI 润色局部、随手抓屏里的字。
+
+---
+
+## 功能
+
+| 能力 | 说明 |
+|------|------|
+| **悬浮窗** | 无边框、可拖拽缩放、置顶、系统托盘显隐 |
+| **Markdown 笔记** | 本地 `.md` 存储，自动保存，弹出列表切换 / 新建 |
+| **编辑模式** | 行号；点行号或拖行号可多选整行 |
+| **显示模式** | 美化预览（标题 / 代码高亮 / 公式 / Mermaid 等） |
+| **AI 解释** | 把选中行加入上下文，只说明、不改文件 |
+| **AI 改写** | 锁定选中行范围，确认后只写回这几行 |
+| **AI 排版** | 按需优化整篇 Markdown 结构（分段、标题、列表） |
+| **OCR** | 画框截屏 / 粘贴 / 拖入图片 → 识别 → 插入或复制 |
+| **AI 接口** | 任意 OpenAI 兼容服务（OpenAI、DeepSeek、本地 Ollama 等） |
+
+AI **不保存长对话**，也不调用工具；密钥存在系统凭证库，不写进配置文件。
+
+---
+
+## 获取与启动
+
+### 下载（Windows 推荐）
+
+1. 打开本仓库 [Actions · Build Windows](https://github.com/Chacolate-209/FloatMD/actions)  
+2. 选一次成功的运行 → 下载 Artifact **`FloatMD-windows-x64`**  
+3. 解压后进入 `FloatMD` 文件夹，双击 **`启动.bat`** 或 **`FloatMD.exe`**
+
+请保留整个文件夹（尤其是 `_internal`），不要只拷贝一个 exe。
+
+若已有 Release，也可在 [Releases](https://github.com/Chacolate-209/FloatMD/releases) 下载安装包。
+
+### 从源码运行
+
+需 Python 3.10+：
 
 ```bash
-cd /home/FloatMD
-python3 -m pip install -e .
-python3 -m floatmd
-```
-
-Windows：
-
-```powershell
-cd \path\to\FloatMD
-python -m pip install -e .
+git clone https://github.com/Chacolate-209/FloatMD.git
+cd FloatMD
+pip install -e .
 python -m floatmd
 ```
 
-## AI 配置（URL / Model / Key）
+---
 
-### 界面配置（推荐）
+## 使用方法
 
-1. 顶栏点 **⚙**，或 AI 面板里的 **⚙**
-2. 填写：
-   - **Base URL**：OpenAI 兼容地址，例如  
-     - OpenAI：`https://api.openai.com/v1`  
-     - DeepSeek：`https://api.deepseek.com/v1`  
-     - 本地 Ollama：`http://127.0.0.1:11434/v1`
-   - **Model**：如 `gpt-4o-mini`、`deepseek-chat`、`llama3.2`
-   - **API Key**：Bearer Token（Ollama 可填任意非空，如 `ollama`）
-3. 勾选「保存到系统钥匙串」→ Key 进 OS 凭证库；不勾选则仅本次进程有效
-4. 保存。更换 Base URL 时会二次确认
+### 日常记笔记
 
-### 落盘位置
+1. 启动后出现悬浮窗，默认可置顶  
+2. 顶栏 **写 / 阅**：写 Markdown，或切换到美化预览  
+3. 点笔记名切换或新建；内容自动保存  
+4. **—** 隐藏到托盘，托盘图标可再打开；**✕** 退出  
 
-| 项 | Linux | Windows |
-|----|-------|---------|
-| 配置 JSON | `~/.local/share/floatmd/config.json` | `%LOCALAPPDATA%\FloatMD\config.json` |
-| 笔记目录 | `~/.local/share/floatmd/notes/` | `%LOCALAPPDATA%\FloatMD\notes\` |
-| API Key | 钥匙串 / 会话内存（**不写进 JSON**） | Credential Manager / 会话 |
+### 配置 AI
 
-`config.json` 里只有 `ai.base_url` / `ai.model` 等，**没有**密钥。
+1. 点顶栏 **⚙**  
+2. 填写：  
+   - **Base URL**（如 `https://api.openai.com/v1`、`https://api.deepseek.com/v1`、`http://127.0.0.1:11434/v1`）  
+   - **Model**（如 `gpt-4o-mini`、`deepseek-chat`）  
+   - **API Key**（Ollama 可填任意非空，例如 `ollama`）  
+3. 保存（更换地址时会确认一次）  
 
-### AI 操作提醒
+### 用 AI 辅助写作
 
-| 按钮 | 行为 |
-|------|------|
-| ＋选区 | 把当前选中行加入上下文（可多段） |
-| 解释 | 只出说明，不改笔记 |
-| 改写 | 锁定 `Lx–Ly`，确认后只写回这几行 |
-| 排版 | 整篇格式优化（唯一全量替换） |
+1. 在 **写** 模式下选中若干行（可点左侧行号，或拖动行号多选）  
+2. 打开 **AI** → **＋选区**（可多次加入多段上下文）  
+3. 可选填一句说明，然后：  
+   - **解释**：只看说明  
+   - **改写**：确认后写回刚才锁定的那些行  
+   - **排版**：整理整篇结构（会替换全文，请确认）  
 
-选行：点行号 / 行号栏拖动 / Shift+点行号 / 正文拖选。
+### OCR 识图
 
-## 打包 Windows `.exe`（推荐：GitHub Actions）
+1. 打开 **OCR**  
+2. **截屏**画框，或 **粘贴** / 拖入图片  
+3. 识别后 **插入**、**追加** 或 **复制**  
 
-当前开发机如果是 Linux，**无法直接交叉编译出可用的 Windows exe**（Qt/WebEngine 不行）。  
-已提供 GitHub Actions：在 GitHub 的 **Windows 虚拟机**上自动打包。
+### 数据在哪
 
-### 步骤
+| | Windows | Linux |
+|--|---------|--------|
+| 笔记 | `%LOCALAPPDATA%\FloatMD\notes\` | `~/.local/share/floatmd/notes/` |
+| 配置 | `%LOCALAPPDATA%\FloatMD\config.json` | `~/.local/share/floatmd/config.json` |
 
-1. 把本项目推到 GitHub 仓库  
-2. 打开仓库 → **Actions** → **Build Windows** → **Run workflow**  
-3. 跑完后在该次运行页面下载 Artifact：`FloatMD-windows-x64`  
-4. 解压得到：
+笔记是普通 Markdown，可用其他编辑器打开。API Key 不在配置文件里。
 
-```
-FloatMD\
-  FloatMD.exe      ← Windows 主程序
-  启动.bat
-  使用说明.txt
-  _internal\       ← 必须保留，不要只拷 exe
-```
+---
 
-打 `v*` 标签（如 `v0.1.0`）时，还会自动挂到 Release。
+## 快捷键
 
-> 体积大约几百 MB～1GB，下载要等一会儿。
+| 快捷键 | 作用 |
+|--------|------|
+| `Ctrl+E` | 写 / 阅 切换 |
+| `Ctrl+Shift+A` | 打开 / 关闭 AI |
+| `Ctrl+Shift+O` | 打开 / 关闭 OCR |
+| `Ctrl+,` | 设置 |
+| `Ctrl+S` | 立即保存 |
+| `Esc` | 先收起 AI/OCR；再按隐藏到托盘 |
 
-### 本机 Windows 打包（可选）
+---
 
-在 Windows 上安装 Python 3.11+ 后：
+## 反馈
 
-```powershell
-.\scripts\build_windows.ps1
-# → dist\FloatMD\FloatMD.exe
-# → dist\FloatMD-windows-x64.zip
-```
-
-### Linux 绿色包（仅 Linux 可用）
-
-```bash
-bash scripts/build.sh
-```
-
-Linux 产物没有 `.exe` 后缀是正常的，且 **不能** 在 Windows 运行。
-
-### 打包注意
-
-- 默认排除 Paddle（体积太大）；OCR 用 RapidOCR
-- 配置写在 `%LOCALAPPDATA%\FloatMD\`，与绿色包路径无关
-
-## 测试
-
-```bash
-python3 -m pytest tests/ -q
-```
-
-## 当前状态
-
-- [x] 悬浮窗 / 托盘 / 笔记 / 编辑·预览
-- [x] AI：解释 / 局部改写（行快照写回）/ 整篇排版
-- [x] OCR：画框 / 粘贴 / 拖入
-- [x] 浅色主题 + CJK 字体
-- [x] PyInstaller 绿色目录脚本
+问题与建议请开 [Issues](https://github.com/Chacolate-209/FloatMD/issues)。
